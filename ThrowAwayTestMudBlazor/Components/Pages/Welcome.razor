@@ -50,7 +50,7 @@
 	private bool IsContactInfoValid()
 	{
 		// For now, only Mobile is required on this step.
-		return !string.IsNullOrWhiteSpace(_patient.Mobile);
+		return !string.IsNullOrWhiteSpace(_patient.Mobile) && _patient.Mobile.Length is >= 10 and <= 14;
 	}
 
 	/// <summary>
@@ -193,7 +193,7 @@
 		public DateTime? BirthDate { get; set; }
 
 		[Required(ErrorMessage = "Mobile number is required.")]
-		[Phone(ErrorMessage = "Invalid Mobile number format.")]
+		[Phone(ErrorMessage = "Invalid Phone number format.")]
 		public string Mobile { get; set; } = string.Empty;
 
 		[Phone(ErrorMessage = "Invalid Phone number format.")]

@@ -1,0 +1,216 @@
+﻿@page "/welcome"
+@using System.ComponentModel.DataAnnotations
+
+<h3>Welcome</h3>
+<EditForm Model="_patient" OnValidSubmit="Submit">
+	<DataAnnotationsValidator />
+	<MudPaper Style="width: 800px">
+		<MudStepper NonLinear OverrideDefaultActions="true" ShowResetButton="true" OnPreviewInteraction="OnPreviewInteraction">
+			<MudStep Title="Personal Information" HasError="@(!IsPersonalInfoValid())">
+				<MudTextField @bind-Value="_patient.FirstName" Label="First Name" Required="true" Immediate="true" For="() => _patient.FirstName" />
+				<MudTextField @bind-Value="_patient.LastName" Label="Last Name" Required="true" Immediate="true" For="() => _patient.LastName" />
+				<MudSelect @bind-Value="_patient.Sex" Label="Sex" Required="true" Immediate="true" For="() => _patient.Sex">
+					<MudSelectItem Value="Sex.Male">Male</MudSelectItem>
+					<MudSelectItem Value="Sex.Female">Female</MudSelectItem>
+					<MudSelectItem Value="Sex.Other">Other</MudSelectItem>
+				</MudSelect>
+				<MudDatePicker @bind-Date="_patient.BirthDate" Label="Birth Date" Required="true" Format="dd-MM-yyyy" DateFormat="dd-MM-yyyy" Immediate="true" For="() => _patient.BirthDate" />
+			</MudStep>
+			<MudStep Title="Contact Information" HasError="@(!IsContactInfoValid())">
+				<MudTextField @bind-Value="_patient.Mobile" Label="Mobile" Required="true" Immediate="true" For="() => _patient.Mobile" />
+				<MudTextField @bind-Value="_patient.Phone" Label="Phone" Immediate="true" For="() => _patient.Phone" />
+				<MudTextField @bind-Value="_patient.Address" Label="Address" Immediate="true" For="() => _patient.Address" />
+				<MudTextField @bind-Value="_patient.AddressNo" Label="Address Number" Immediate="true" For="() => _patient.AddressNo" />
+			</MudStep>
+			<MudStep Title="Additional Information">
+				<MudTextField @bind-Value="_patient.Amka" Label="AMKA" Immediate="true" For="() => _patient.Amka" />
+				<MudTextField @bind-Value="_patient.Afm" Label="AFM" Immediate="true" For="() => _patient.Afm" />
+			</MudStep>
+		</MudStepper>
+	</MudPaper>
+</EditForm>
+
+@* <MudButton OnClick="Reset" Color="Color.Secondary">Reset</MudButton> *@
+
+@code {
+	[Inject]
+	public IDialogService DialogService { get; set; }
+	private int TotalSteps => 3;
+	private Patient _patient = new Patient();
+	private Dictionary<string, string> _validationMessages = new Dictionary<string, string>();
+	// Helper methods to determine if the current step’s required fields are valid
+	private bool IsPersonalInfoValid()
+	{
+		return !string.IsNullOrWhiteSpace(_patient.FirstName)
+			&& !string.IsNullOrWhiteSpace(_patient.LastName)
+			&& !string.IsNullOrWhiteSpace(_patient.Sex)
+			&& _patient.BirthDate.HasValue;
+	}
+
+	private bool IsContactInfoValid()
+	{
+		// For now, only Mobile is required on this step.
+		return !string.IsNullOrWhiteSpace(_patient.Mobile);
+	}
+
+	/// <summary>
+	/// This event fires whenever a navigation action occurs.
+	/// </summary>
+	private async Task OnPreviewInteraction(StepperInteractionEventArgs arg)
+	{
+		if (arg.Action == StepAction.Complete)
+		{
+			if (arg.StepIndex < TotalSteps - 1)
+			{
+				await ControlStepCompletion(arg);
+			}
+			else
+			{
+				// We're on the last step.
+				if (!IsPersonalInfoValid() || !IsContactInfoValid())
+				{
+					await DialogService.ShowMessageBox("Error", "Please complete all required fields before submitting.");
+					arg.Cancel = true;
+					return;
+				}
+				Submit();
+				arg.Cancel = true; // Optionally, cancel navigation if you want to stay on the last step after submitting.
+			}
+		}
+		else if (arg.Action == StepAction.Activate)
+		{
+			await ControlStepNavigation(arg);
+		}
+	}
+
+
+	/// <summary>
+	/// Validates the current step when the user clicks the Next button.
+	/// </summary>
+	private async Task ControlStepCompletion(StepperInteractionEventArgs arg)
+	{
+		switch (arg.StepIndex)
+		{
+			case 0:
+				if (!IsPersonalInfoValid())
+				{
+					await DialogService!.ShowMessageBox("Error", "Please complete all personal information fields before proceeding.");
+					arg.Cancel = true;
+				}
+				break;
+			case 1:
+				if (!IsContactInfoValid())
+				{
+					await DialogService!.ShowMessageBox("Error", "Please provide your mobile number in Contact Information before proceeding.");
+					arg.Cancel = true;
+				}
+				break;
+			// Step 2 (Additional Information) might not have required validations
+			default:
+				break;
+		}
+	}
+
+	/// <summary>
+	/// Handles direct navigation when a step header is clicked.
+	/// </summary>
+	private async Task ControlStepNavigation(StepperInteractionEventArgs arg)
+	{
+		// Prevent navigation to a later step if previous steps are incomplete.
+		switch (arg.StepIndex)
+		{
+			case 1:
+				if (!IsPersonalInfoValid())
+				{
+					await DialogService!.ShowMessageBox("Error", "Finish Personal Information before navigating to Contact Information.");
+					arg.Cancel = true;
+				}
+				break;
+			case 2:
+				if (!IsPersonalInfoValid() || !IsContactInfoValid())
+				{
+					await DialogService!.ShowMessageBox("Error", "Complete the previous steps before navigating to Additional Information.");
+					arg.Cancel = true;
+				}
+				break;
+			default:
+				break;
+		}
+	}
+
+	private void Submit()
+	{
+		DialogService.ShowMessageBox("End", "We are done here form submitted").ConfigureAwait(true);
+		_validationMessages.Clear();
+		var validationContext = new ValidationContext(_patient);
+		var validationResults = new List<ValidationResult>();
+		if (!Validator.TryValidateObject(_patient, validationContext, validationResults, true))
+		{
+			foreach (var validationResult in validationResults)
+			{
+				foreach (var memberName in validationResult.MemberNames)
+				{
+					_validationMessages[memberName] = validationResult.ErrorMessage ?? string.Empty;
+				}
+			}
+		}
+		else
+		{
+			// Handle successful form submission
+		}
+	}
+
+	// private void Reset()
+	// {
+	// 	_patient = new Patient();
+
+	// 	_validationMessages.Clear();
+	// }
+
+	public class Sex
+	{
+		public const string Male = "Male";
+		public const string Female = "Female";
+		public const string Other = "Other";
+	}
+
+	public class Patient
+	{
+		[Required(ErrorMessage = "First Name is required.")]
+		[StringLength(50, ErrorMessage = "First Name cannot be longer than 50 characters.")]
+		public string FirstName { get; set; } = string.Empty;
+
+		[Required(ErrorMessage = "Last Name is required.")]
+		[StringLength(50, ErrorMessage = "Last Name cannot be longer than 50 characters.")]
+		public string LastName { get; set; } = string.Empty;
+
+		[Required(ErrorMessage = "Sex is required.")]
+		[StringLength(10, ErrorMessage = "Sex cannot be longer than 10 characters.")]
+		public string Sex { get; set; } = string.Empty;
+
+		[Required(ErrorMessage = "Birth Date is required.")]
+		[Range(typeof(DateTime), "1/1/1900", "1/1/2100", ErrorMessage = "Invalid Birth Date")]
+		public DateTime? BirthDate { get; set; }
+
+		[Required(ErrorMessage = "Mobile number is required.")]
+		[Phone(ErrorMessage = "Invalid Mobile number format.")]
+		public string Mobile { get; set; } = string.Empty;
+
+		[Phone(ErrorMessage = "Invalid Phone number format.")]
+		public string? Phone { get; set; }
+
+		[StringLength(100, ErrorMessage = "Address cannot be longer than 100 characters.")]
+		public string? Address { get; set; }
+
+		[StringLength(10, ErrorMessage = "Address Number cannot be longer than 10 characters.")]
+		public string AddressNo { get; set; } = string.Empty;
+
+		[MinLength(11)]
+		[StringLength(11, ErrorMessage = "AMKA cannot be longer than 11 characters.")]
+		public string? Amka { get; set; }
+
+		[StringLength(9, ErrorMessage = "AFM cannot be longer than 9 characters.")]
+		public string? Afm { get; set; }
+	}
+
+}
